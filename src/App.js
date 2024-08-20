@@ -1,25 +1,20 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from 'react';
+import SearchBox from './components/SearchBox';
+import Map from './components/Map';
 
-function App() {
+const App = () => {
+  const [routeGeometry, setRouteGeometry] = useState(null);
+
+  const handleRouteFetched = (geometry) => {
+    setRouteGeometry(geometry);
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <SearchBox onRouteFetched={handleRouteFetched} />
+      {routeGeometry && <Map routeGeometry={routeGeometry} />}
     </div>
   );
-}
+};
 
 export default App;
