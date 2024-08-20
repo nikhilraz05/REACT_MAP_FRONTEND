@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Function to decode polyline encoded string
@@ -41,6 +42,28 @@ const reverseGeocode = async (lat, lon) => {
   }
 };
 
+// Component to fit map bounds to polyline
+const FitBoundsToPolyline = ({ positions }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (positions.length > 0) {
+      const bounds = positions.map(coord => [coord[0], coord[1]]);
+      map.fitBounds(bounds);
+    }
+  }, [positions, map]);
+
+  return null;
+};
+
+// Custom green marker icons
+const greenIcon = new L.Icon({
+  iconUrl: 'https://chart.apis.google.com/chart?chst=d_map_pin_icon&chld=glyphish_location|4CAF50',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32]
+});
+
 const Map = ({ routeGeometry }) => {
   const [places, setPlaces] = useState([]);
   const [markers, setMarkers] = useState([]);
@@ -51,7 +74,6 @@ const Map = ({ routeGeometry }) => {
       // Decode the polyline string to get the coordinates
       const coordinates = decodePolyline(routeGeometry);
       setPolylinePositions(coordinates);  // Set the entire polyline path
-      console.log(coordinates);
 
       // Fetch start and end places
       const fetchPlaces = async () => {
@@ -74,19 +96,22 @@ const Map = ({ routeGeometry }) => {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       {polylinePositions.length > 1 && (
-        <Polyline
-          positions={polylinePositions}
-          color="red"
-          weight={5}
-          opacity={0.7}
-        />
+        <>
+          <FitBoundsToPolyline positions={polylinePositions} />
+          <Polyline
+            positions={polylinePositions}
+            color="red"
+            weight={5}
+            opacity={0.7}
+          />
+        </>
       )}
       {markers.length === 2 && (
         <>
-          <Marker position={markers[0]}>
+          <Marker position={markers[0]} icon={greenIcon}>
             <Popup>{places[0] || 'Start Location'}</Popup>
           </Marker>
-          <Marker position={markers[1]}>
+          <Marker position={markers[1]} icon={greenIcon}>
             <Popup>{places[1] || 'End Location'}</Popup>
           </Marker>
         </>
