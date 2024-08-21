@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import io from 'socket.io-client';
 import startIcons from '../assets/start.png';
 import endIcons from '../assets/end.jpeg';
+import bikeIconImage from '../assets/bike1.jpg'; // Add your bike icon image here
 
-// Function to decode polyline encoded string
 const decodePolyline = (encoded) => {
   let points = [];
   let index = 0, lat = 0, lng = 0;
@@ -32,19 +33,27 @@ const decodePolyline = (encoded) => {
   return points;
 };
 
-// Function to reverse geocode coordinates
-const reverseGeocode = async (lat, lon) => {
-  try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-    const data = await response.json();
-    return data.display_name;
-  } catch (error) {
-    console.error("Error fetching place name:", error);
-    return "Unknown Location";
-  }
-};
+const startIcon = new L.Icon({
+  iconUrl: startIcons,
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
 
-// Component to fit map bounds to polyline
+const endIcon = new L.Icon({
+  iconUrl: endIcons,
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
+const bikeIcon = new L.Icon({
+  iconUrl: bikeIconImage,
+  iconSize: [10, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
 const FitBoundsToPolyline = ({ positions }) => {
   const map = useMap();
 
@@ -58,48 +67,32 @@ const FitBoundsToPolyline = ({ positions }) => {
   return null;
 };
 
-// Custom icons for start and end markers
-const startIcon = new L.Icon({
-  iconUrl: startIcons, // Replace with your start icon image path
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32]
-});
-
-const endIcon = new L.Icon({
-  iconUrl: endIcons, // Replace with your end icon image path
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32]
-});
-
 const Map = ({ routeGeometry }) => {
-  const [places, setPlaces] = useState([]);
   const [markers, setMarkers] = useState([]);
   const [polylinePositions, setPolylinePositions] = useState([]);
+  const [bikePosition, setBikePosition] = useState(null);
 
   useEffect(() => {
     if (routeGeometry) {
-      // Decode the polyline string to get the coordinates
       const coordinates = decodePolyline(routeGeometry);
-      setPolylinePositions(coordinates);  // Set the entire polyline path
-
-      // Fetch start and end places
-      const fetchPlaces = async () => {
-        const startPlace = await reverseGeocode(coordinates[0][0], coordinates[0][1]);
-        const endPlace = await reverseGeocode(coordinates[coordinates.length - 1][0], coordinates[coordinates.length - 1][1]);
-        setPlaces([startPlace, endPlace]);
-
-        // Set markers at the start and end coordinates
-        setMarkers([coordinates[0], coordinates[coordinates.length - 1]]);
-      };
-
-      fetchPlaces();
+      setPolylinePositions(coordinates);
+      setMarkers([coordinates[0], coordinates[coordinates.length - 1]]);
+      setBikePosition(coordinates[0]); // Initially place the bike at the start
     }
   }, [routeGeometry]);
 
+  useEffect(() => {
+    const socket = io('http://localhost:5000');
+
+    socket.on('bikeLocationUpdate', (location) => {
+      setBikePosition([location.lat, location.lon]);
+    });
+
+    return () => socket.disconnect();
+  }, []);
+
   return (
-    <MapContainer center={markers[0] || [51.505, -0.09]} zoom={13} style={{ height: '100vh', width: '100%' }}>
+    <MapContainer center={bikePosition || [51.505, -0.09]} zoom={13} style={{ height: '100vh', width: '100%' }}>
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -118,12 +111,17 @@ const Map = ({ routeGeometry }) => {
       {markers.length === 2 && (
         <>
           <Marker position={markers[0]} icon={startIcon}>
-            <Popup>{places[0] || 'Start Location'}</Popup>
+            <Popup>Start Location</Popup>
           </Marker>
           <Marker position={markers[1]} icon={endIcon}>
-            <Popup>{places[1] || 'End Location'}</Popup>
+            <Popup>End Location</Popup>
           </Marker>
         </>
+      )}
+      {bikePosition && (
+        <Marker position={bikePosition} icon={bikeIcon}>
+          <Popup>Bike Location</Popup>
+        </Marker>
       )}
     </MapContainer>
   );
